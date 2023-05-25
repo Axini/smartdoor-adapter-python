@@ -1,0 +1,6 @@
+# Dependencies for tests
+pytest
+pytest-cov
+pytest-spec
+pylint
+deepdiff

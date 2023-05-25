@@ -1,0 +1,9 @@
+wheel
+sphinx~=6.2.1
+sphinx-rtd-theme
+protobuf
+websocket-client~=1.5.1
+setuptools==67.8.0
+build
+virtualenv
+datetime

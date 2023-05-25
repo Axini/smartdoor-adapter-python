@@ -1,0 +1,17 @@
+.idea/
+build/
+dist/
+_build/
+_generate/
+*.so
+*.py[cod]
+*.egg-info
+*env*
+*coverage*
+Testing/
+CMakeCache.txt
+cmake_install.cmake
+CMakeFiles/
+Makefile
+__pycache__
+.pytest_cache
