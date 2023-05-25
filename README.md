@@ -13,7 +13,7 @@ he below steps presume that the `python` and `pip` commands are resolvable in yo
 ### Setting it up
 - Clone this repository
 - Open a terminal or command prompt
-- (OPTIONAL) Create a separate virtual environment `python -m venv <name_of_virtual_env_dir>`
+- (OPTIONAL) Create a separate virtual environment and activate it `python -m venv <name_of_virtual_env_dir>` and `source <name_of_virtual_env_dir>/bin/activate`
 - Perform `pip install -r ./requirements.txt`. This should download all the required dependencies
 
 ### Starting the adapter
