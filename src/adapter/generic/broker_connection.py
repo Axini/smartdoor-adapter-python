@@ -63,9 +63,9 @@ class BrokerConnection:
             close_status_code (int): The status code returned by closing the connection
             close_msg (str): The reason for the connection termination.
         """
-        logging.info('Stopped connection with code: {code}, with reason: {reason}'
+        logging.info('WebSocket connection has been closed with code: {code}, with reason: {reason}'
                      .format(code=close_status_code, reason=close_msg))
-        self.websocket.close()
+        self.adapter_core.on_close()
 
 
     def on_message(self, message):

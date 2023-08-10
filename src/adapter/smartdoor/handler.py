@@ -35,16 +35,11 @@ class Handler(AbstractHandler):
         logging.debug('response received: {label}'.format(label=raw_message))
 
         if raw_message == 'RESET_PERFORMED':
+            # After 'RESET_PERFORMED', the SUT is ready for a new test case.
             self.adapter_core.send_ready()
         else:
-            message = Label(
-                sort=Sort.RESPONSE,
-                name=raw_message.lower(),
-                channel='door',
-                physical_label=bytes(raw_message, 'UTF-8'),
-                timestamp=datetime.now())
-
-            self.adapter_core.send_response(message)
+            label = self._message2label(raw_message)
+            self.adapter_core.send_response(label)
 
     def start(self, configuration: Configuration):
         """
@@ -86,15 +81,8 @@ class Handler(AbstractHandler):
             str: The raw message send to the SUT (in a format that is understood by the SUT).
         """
         logging.debug('Stimulate is called, passing the message to the SUT')
-
-        # Convert the message to a message known to the sut
-        if label.name in ['lock', 'unlock']:
-            sd_msg = '{msg}:{passcode}'.format(msg=label.name.upper(), passcode=label.parameters[0].value)
-        else:
-            sd_msg = '{msg}'.format(msg=label.name.upper())
-
+        sd_msg = self._label2message(label)
         self.sut.send(sd_msg)
-
         return bytes(sd_msg, 'UTF-8')
 
     def supported_labels(self):
@@ -127,8 +115,48 @@ class Handler(AbstractHandler):
         Returns:
             Configuration
         """
-        return Configuration([ConfigurationItem(name='endpoint',
-                                                tipe=Type.STRING,
-                                                description='Base websocket URL of the SmartDoor API',
-                                                value='ws://localhost:3001'),
-                              ])
+        return Configuration([ConfigurationItem(\
+            name='endpoint',
+            tipe=Type.STRING,
+            description='Base websocket URL of the SmartDoor API',
+            value='ws://localhost:3001'),
+        ])
+
+    def _label2message(self, label: Label):
+        """
+        Converts a Protobuf label to a SUT message.
+
+        Args:
+            label (Label)
+        Returns:
+            str: The message to be sent to the SUT.
+        """
+
+        sut_msg = None
+        command_name = label.name.upper()
+        if label.name in ['lock', 'unlock']:
+            sut_msg = '{msg}:{passcode}'.format(msg=command_name, passcode=label.parameters[0].value)
+        else:
+            sut_msg = '{msg}'.format(msg=command_name)
+
+        return sut_msg
+
+    def _message2label(self, message: str):
+        """
+        Converts a SUT message to a Protobuf Label.
+
+        Args:
+            message (str)
+        Returns:
+            Label: The converted message as a Label.
+        """
+
+        label_name = message.lower()
+        label = Label(
+            sort=Sort.RESPONSE,
+            name=label_name,
+            channel='door',
+            physical_label=bytes(message, 'UTF-8'),
+            timestamp=datetime.now())
+
+        return label

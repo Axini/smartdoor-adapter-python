@@ -58,6 +58,13 @@ class AdapterCore:
         else:
             logging.info('Connection opened while already connected')
 
+    def on_close(self):
+        """ Connection with AMP has been closed. Try to reconnect. """
+        self.state = State.DISCONNECTED
+        self.handler.stop()
+        logging.info('Trying to reconnect to AMP.')
+        self.start() # reconnect to AMP - keep the adapter alive
+
     def on_configuration(self, pb_config: configuration_pb2.Configuration):
         """
         Broker call back when a `Configuration` message is received from AMP.

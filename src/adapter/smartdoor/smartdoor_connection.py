@@ -88,5 +88,8 @@ class SmartDoorConnection:
         """
         if self.websocket:
             self.websocket.close()
-            self.wst.stop()
+            logging.debug('Stopping thread which handles WebSocket connection with SUT')
+            self.websocket.keep_running = False
+            self.wst.join()
+            logging.debug('Thread stopped')
             self.wst = None
