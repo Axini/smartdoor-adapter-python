@@ -12,14 +12,6 @@ adapter.generic.api.announcement\_pb2 module
    :undoc-members:
    :show-inheritance:
 
-adapter.generic.api.announcements\_pb2 module
----------------------------------------------
-
-.. automodule:: adapter.generic.api.announcements_pb2
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
 adapter.generic.api.configuration module
 ----------------------------------------
 
