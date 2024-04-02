@@ -1,7 +1,5 @@
 import logging
-
 import websocket
-
 
 class BrokerConnection:
     """
@@ -54,7 +52,6 @@ class BrokerConnection:
         logging.info('Successfully opened a connection')
         self.adapter_core.on_open()
 
-
     def on_close(self, close_status_code, close_msg):
         """
         Callback handler for when the connection with the Axini Modeling Platform is closed.
@@ -67,7 +64,6 @@ class BrokerConnection:
                      .format(code=close_status_code, reason=close_msg))
         self.adapter_core.on_close()
 
-
     def on_message(self, message):
         """
         Callback handler for when a message is received from the Axini Modeling Platform.
@@ -77,7 +73,6 @@ class BrokerConnection:
         """
         logging.debug('Received a message: {msg}'.format(msg=message))
         self.adapter_core.handle_message(message)
-
 
     def on_error(self, err):
         """
@@ -91,7 +86,6 @@ class BrokerConnection:
 
         logging.debug('Closing the connection...')
         self.websocket.close()
-
 
     def close(self, reason='', code=-1):
         """
@@ -107,7 +101,6 @@ class BrokerConnection:
             self.websocket.close()
         else:
             logging.warning('No websocket initialized to close')
-
 
     def send(self, raw_message):
         """

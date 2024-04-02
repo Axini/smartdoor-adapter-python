@@ -1,7 +1,8 @@
-
 ## Description
 This project defines a *Python* implementation of a plugin adapter for Axini's standalone SmartDoor application (SUT). 
 It connects the Axini Modeling Platform (AMP) to the standalone SmartDoor SUT.
+
+See https://github/axini and the plugin-adapter-protocol repository for some general information on Axini's plugin adapter protocol. Axini's training on "plugin adapters" provides additional and more detailed information.
 
 The software is distributed under the MIT license, see LICENSE.
 
@@ -29,3 +30,15 @@ This example adapter is depended on Python (>= 3.10) and uses `pip` for its depe
 - Go to `docs/`.
 - Run `make html`.
 - Documentation is generated under `docs/_build`.
+
+### Some notes on the implementation
+The AMP related code is stored in src/adapter/generic and can be used as-is for **any** Python plugin adapter. All SUT specific code (in this case for the SmartDoor SUT) is stored in src/adapter/smartdoor and should be modified for any new SUT.
+
+#### Threads
+The main thread of the adapter ensures that messages from AMP are received and handled. The SmartdoorConnection class (in src/adapter/smartdoor) starts a separate thread which is used for the messages from the SmartDoor SUT over the WebSocket connection between the SUT and the adapter. 
+
+The class QThread (in src/adapter/generic) manages a Queue of items and a Thread. Items can be added to the Queue and the Thread processes items from the queue in a FIFO manner. The Queue can also be emptied.
+
+The plugin adapter (class AdapterCore in src/adapter/generic) uses two QThreads for (i) sending messages to AMP and (ii) calling handler's stimulate method. This ensures that messages from AMP (stimuli) and the SUT (responses) are serviced immediately: any resulting message is added to a queue of pending messages which is processed by either one of the two QThreads.
+
+The plugin adapter and all its threads are set to run forever. No code is added to gracefully terminate the adapter and its threads. Consequently, when terminating the adapter with Ctrl-C, you will observe several Exceptions on the stderr. This is harmless, though.

@@ -1,8 +1,6 @@
 import logging
 import threading
-
 import websocket
-
 
 class SmartDoorConnection:
     """
@@ -22,7 +20,7 @@ class SmartDoorConnection:
 
     def connect(self):
         """
-            Connect to the SmartDoor SUT
+        Connect to the SmartDoor SUT.
         """
         logging.info('Connecting to SmartDoor')
 
@@ -41,7 +39,7 @@ class SmartDoorConnection:
 
     def send(self, message):
         """
-        Send a message to the SUT
+        Send a message to the SUT.
 
         Args:
             message (str): Message to send
@@ -59,18 +57,18 @@ class SmartDoorConnection:
 
     def on_close(self):
         """
-        Callback that is called when the socket is closed
+        Callback that is called when the socket is closed.
         """
         logging.debug('Closed connection to SUT')
 
     def on_message(self, msg):
         """
-        Callback that is called when the SUT sends a message
+        Callback that is called when the SUT sends a message.
 
         Args:
             msg (str): Message of the SmartDoor SUT
         """
-        logging.debug('Received message from sut: {msg}'.format(msg=msg))
+        logging.debug('Received message from SUT: {msg}'.format(msg=msg))
         self.handler.send_message_to_amp(msg)
 
     def on_error(self, msg):
@@ -80,11 +78,11 @@ class SmartDoorConnection:
         Args:
             msg (str): Error message
         """
-        logging.error("Error with connection to sut: {e}".format(e=msg))
+        logging.error("Error with connection to SUT: {e}".format(e=msg))
 
     def stop(self):
         """
-        Perform any cleanup if the SUT is closed
+        Perform any cleanup if the SUT is closed.
         """
         if self.websocket:
             self.websocket.close()

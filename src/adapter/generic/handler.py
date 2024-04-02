@@ -1,9 +1,10 @@
+import logging
+
 from abc import ABC, abstractmethod
 from typing import List
 
 from generic.api.configuration import Configuration
 from generic.api.label import Label
-
 
 class Handler(ABC):
     """
@@ -25,7 +26,7 @@ class Handler(ABC):
     @abstractmethod
     def start(self, configuration: Configuration):
         """
-        Start a new test case
+        Start a new test case.
 
         Args:
             configuration (Configuration): The configuration needed to start testing
@@ -36,6 +37,7 @@ class Handler(ABC):
     def reset(self):
         """
         Prepare the SUT for the next test case.
+        This method should be called by the child's reset() method.
         """
         pass
 
@@ -43,16 +45,17 @@ class Handler(ABC):
     def stop(self):
         """
         Stop the SUT from testing.
+        This method should be called by the child's reset() method.
         """
         pass
 
     @abstractmethod
     def stimulate(self, label: Label) -> str:
         """
-        Processes a stimulus of a given label.
+        Processes a stimulus of a given label at the SUT.
 
         Args:
-            label (Label): Label that the Axini Modeling Platform sent
+            label (Label): stimulus that the Axini Modeling Platform has sent
 
         Returns:
              str: The physical label.

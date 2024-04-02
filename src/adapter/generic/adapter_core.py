@@ -1,14 +1,17 @@
 import logging
 import time
+
 from enum import Enum
 from typing import List
+from queue import Queue
+from threading import Thread
 
 from .api import label_pb2, message_pb2, announcement_pb2, configuration_pb2
 from .api.configuration import Configuration
 from .api.label import Label
 from .broker_connection import BrokerConnection
 from .handler import Handler
-
+from .qthread import QThread
 
 class State(Enum):
     """
@@ -25,7 +28,7 @@ class State(Enum):
 class AdapterCore:
     """
     This class implements the core of a plugin-adapter. It handles the connection
-    to the broker (`BrokerConnection`) and the connection to the sut (via the `Handler`).
+    to the broker (`BrokerConnection`) and the connection to the SUT (via the `Handler`).
     Initially the adapter is in a DISCONNECTED state.
 
     Attributes:
@@ -40,8 +43,21 @@ class AdapterCore:
         self.handler = handler
         self.state = State.DISCONNECTED
 
+        # QThread for sending messages to AMP.
+        self.qthread_to_amp = QThread(process_item = self._send_message_to_amp)
+        self.qthread_to_amp.start()
+
+        # QThread for injecting stimuli into the SUT.
+        self.qthread_to_sut = QThread(process_item = self._call_stimulate)
+        self.qthread_to_sut.start()
+
     def start(self):
         """ Start the adapter core which will open a connection with AMP. """
+
+        logging.info('Clearing queues with pending messages')
+        self.qthread_to_amp.clear_queue()
+        self.qthread_to_sut.clear_queue()
+
         if self.state == State.DISCONNECTED:
             logging.info('Connecting to broker')
             self.broker_connection.connect()
@@ -62,7 +78,7 @@ class AdapterCore:
         """ Connection with AMP has been closed. Try to reconnect. """
         self.state = State.DISCONNECTED
         self.handler.stop()
-        logging.info('Trying to reconnect to AMP.')
+        logging.info('Trying to reconnect to AMP')
         self.start() # reconnect to AMP - keep the adapter alive
 
     def on_configuration(self, pb_config: configuration_pb2.Configuration):
@@ -84,10 +100,12 @@ class AdapterCore:
                 logging.error('Error connection to the SUT: {}'.format(e))
                 self.send_error(str(e))
                 return
+
         elif self.state == State.CONNECTED:
             message = 'Configuration received while not yet announced'
             logging.error(message)
             self.send_error(message)
+
         else:
             message = 'Configuration received while already configured'
             logging.error(message)
@@ -101,28 +119,19 @@ class AdapterCore:
             pb_label (label_pb2.Label)
         """
         if self.state == State.READY:
-            physical_label = None
-
             if pb_label.type != label_pb2.Label.LabelType.STIMULUS:
                 message = 'Label is not a stimulus'
                 logging.error(message)
                 self.send_error(message)
 
             try:
-                # Perform the stimulus action which could trigger a response.
-                logging.debug('Stimulating label: {label}'.format(label=pb_label.label))
-                physical_label = self.handler.stimulate(Label.decode(pb_label))
+                # Perform the stimulus action (which could trigger a response).
+                logging.debug("Adding stimulus '{label}' to the queue of stimuli for the SUT".format(label=pb_label.label))
+                self.qthread_to_sut.put(pb_label)
+
             except Exception as e:
                 logging.error('Exception: {ex}'.format(ex=e))
                 self.send_error('error while stimulating the SUT: {ex}'.format(ex=e))
-
-            # Confirm the label
-            logging.debug('Confirming stimulus label: {label}'.format(label=pb_label.label))
-
-            pb_label.physical_label = physical_label
-            pb_label.timestamp = time.time_ns()
-
-            self._confirm_stimulus(pb_label)
         else:
             message = 'Label received from AMP while not ready'
             logging.error(message)
@@ -133,14 +142,18 @@ class AdapterCore:
         if self.state == State.READY:
             logging.debug('Reset message received')
 
+            logging.info('Clearing queues with pending messages')
+            self.qthread_to_amp.clear_queue()
+            self.qthread_to_sut.clear_queue()
+
             try:
                 response = self.handler.reset()
-
                 if response:
                     message = 'Resetting the SUT failed due to: {reason}'.format(reason=response)
                     logging.error(message)
                     self.send_error(message)
                     return
+
             except Exception as e:
                 message = 'Error while resetting connection to the SUT: {reason}'.format(reason=str(e))
                 logging.error(message)
@@ -177,7 +190,7 @@ class AdapterCore:
 
     def send_response(self, label: Label):
         """
-        Send the response from the SUT back to AMP
+        Send the response from the SUT back to AMP.
 
         Args:
             label (Label): Label to be sent back to AMP
@@ -185,25 +198,16 @@ class AdapterCore:
         pb_label = label.encode()
 
         if pb_label.type == label_pb2.Label.LabelType.RESPONSE:
+            logging.info('Sending response to AMP: !{label}'.format(label=pb_label.label))
             self._send_message(message_pb2.Message(label=pb_label))
         else:
             message = 'Label is not of type Response'
             logging.error(message)
             self.send_error(message)
 
-    def _confirm_stimulus(self, pb_label):
-        """
-        Confirm a received stimulus by sending it back to AMP.
-
-        Args:
-            pb_label (label_pb2.Label)
-        """
-        logging.debug('Sending stimulus (back) to AMP')
-        self._send_message(message_pb2.Message(label=pb_label))
-
     def send_ready(self):
         """
-        Let AMP know the adapter is ready to start testing
+        Let AMP know the adapter is ready to start testing.
         """
 
         logging.debug('Sending ready')
@@ -229,6 +233,17 @@ class AdapterCore:
         )
 
         self._send_message(message_pb2.Message(announcement=pb_announcement))
+
+    def _send_stimulus_confirmation(self, pb_label: label_pb2.Label):
+        """
+        Confirm a received stimulus by sending it back to AMP.
+        The fields of pb_label have already been set by the caller.
+
+        Args:
+            pb_label (label_pb2.Label)
+        """
+        logging.debug('Sending stimulus (back) to AMP: {label}'.format(label=pb_label.label))
+        self._send_message(message_pb2.Message(label=pb_label))
 
     def handle_message(self, raw_message:str):
         """
@@ -264,9 +279,25 @@ class AdapterCore:
 
     def _send_message(self, message: message_pb2.Message):
         """
-        Convenient method that calls the broker to send a message to AMP
+        Adds message to the queue of pending messages to AMP.
+        Separate thread takes care of the actual sending of the message.
+        See _worker_send_messages_to_amp below.
 
         Args:
             message (message_pb2.Message)
         """
+        logging.debug('Adding message to the queue ({id})'.format(id=id(message)))
+        self.qthread_to_amp.put(message)
+
+    def _send_message_to_amp(self, message):
+        """ QThread's process_item method for sending a message to AMP. """
+        logging.debug('Sending message to AMP ({id})'.format(id=id(message)))
         self.broker_connection.send(message.SerializeToString())
+
+    def _call_stimulate(self, pb_label):
+        """ QThread's process_item method for processing a pb_label stimulus. """
+        label = Label.decode(pb_label)
+        logging.debug("Call handler.stimulate for '{name}'".format(name=label.name))
+        pb_label.timestamp = time.time_ns()
+        pb_label.physical_label = self.handler.stimulate(label)
+        self._send_stimulus_confirmation(pb_label)

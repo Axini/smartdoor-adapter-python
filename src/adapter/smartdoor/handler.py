@@ -7,14 +7,13 @@ from generic.api.parameter import Type, Parameter
 from generic.handler import Handler as AbstractHandler
 from smartdoor.smartdoor_connection import SmartDoorConnection
 
-
 def _response(name, channel='door', parameters=None):
+    """ Helper method to create a response Label. """
     return Label(Sort.RESPONSE, name, channel, parameters=parameters)
 
-
 def _stimulus(name, channel='door', parameters=None):
+    """ Helper method to create a stimulus Label. """
     return Label(Sort.STIMULUS, name, channel, parameters=parameters)
-
 
 class Handler(AbstractHandler):
     """
@@ -56,34 +55,38 @@ class Handler(AbstractHandler):
         """
         Prepare the SUT for the next test case.
         """
-        logging.info('Resetting the sut for new test cases')
+        logging.info('Resetting the SUT for a new test case')
+        super().reset()
         self.sut.send('RESET')
 
     def stop(self):
         """
         Stop the SUT from testing.
         """
-        logging.info('Stopping the plugin adapter from plugin handler')
-
+        logging.info('Stopping the plugin handler')
+        super().stop()
         self.sut.stop()
         self.sut = None
 
-        logging.debug('Finished stopping the plugin adapter from plugin handler')
+        logging.debug('Finished stopping the plugin handler')
 
-    def stimulate(self, label: Label):
+    def stimulate(self, label: Label) -> str:
         """
-        Processes a stimulus of a given Label message.
+        Processes a stimulus of a given Label message at the SUT.
 
         Args:
             label (Label)
 
         Returns:
-            str: The raw message send to the SUT (in a format that is understood by the SUT).
+            str: The raw message send to the SUT (in a format that is
+                 understood by the SUT).
         """
-        logging.debug('Stimulate is called, passing the message to the SUT')
-        sd_msg = self._label2message(label)
-        self.sut.send(sd_msg)
-        return bytes(sd_msg, 'UTF-8')
+        # leading spaces are needed to justify the stimuli and responses
+        logging.info('      Injecting stimulus @SUT: ?{name}'.format(name=label.name))
+        sut_msg = self._label2message(label)
+        self.sut.send(sut_msg)
+        physical_label = bytes(sut_msg, 'UTF-8')
+        return physical_label
 
     def supported_labels(self):
         """

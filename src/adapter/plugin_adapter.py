@@ -8,7 +8,6 @@ from smartdoor.handler import Handler
 
 ADAPTER_NAME = 'Smartdoor'
 
-
 def start_plugin_adapter(adapter_name: str, url: str, token: str, loglevel: int):
     """
     Start the adapter and connect with AMP.
@@ -34,7 +33,6 @@ def start_plugin_adapter(adapter_name: str, url: str, token: str, loglevel: int)
     handler.register_adapter_core(adapter_core)
 
     adapter_core.start()
-
 
 if __name__ == '__main__':
     print("Parsing arguments")
