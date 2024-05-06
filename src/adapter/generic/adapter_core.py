@@ -53,8 +53,7 @@ class AdapterCore:
 
     def start(self):
         """ Start the adapter core which will open a connection with AMP. """
-
-        logging.info('Clearing queues with pending messages')
+        logging.debug('Clearing queues with pending messages')
         self.qthread_to_amp.clear_queue()
         self.qthread_to_sut.clear_queue()
 
@@ -77,6 +76,11 @@ class AdapterCore:
     def on_close(self):
         """ Connection with AMP has been closed. Try to reconnect. """
         self.state = State.DISCONNECTED
+
+        logging.info('Clearing queues with pending messages')
+        self.qthread_to_amp.clear_queue()
+        self.qthread_to_sut.clear_queue()
+
         self.handler.stop()
         logging.info('Trying to reconnect to AMP')
         self.start() # reconnect to AMP - keep the adapter alive
@@ -185,7 +189,7 @@ class AdapterCore:
         Args:
             message (str): Send an error message to AMP
         """
-        self._send_message(message_pb2.Message(error=message_pb2.Message.Error(message=message)))
+        self._queue_message_to_amp(message_pb2.Message(error=message_pb2.Message.Error(message=message)))
         self.broker_connection.close(reason=message)
 
     def send_response(self, label: Label):
@@ -199,7 +203,7 @@ class AdapterCore:
 
         if pb_label.type == label_pb2.Label.LabelType.RESPONSE:
             logging.info('Sending response to AMP: !{label}'.format(label=pb_label.label))
-            self._send_message(message_pb2.Message(label=pb_label))
+            self._queue_message_to_amp(message_pb2.Message(label=pb_label))
         else:
             message = 'Label is not of type Response'
             logging.error(message)
@@ -211,7 +215,7 @@ class AdapterCore:
         """
 
         logging.debug('Sending ready')
-        self._send_message(message_pb2.Message(ready=message_pb2.Message.Ready()))
+        self._queue_message_to_amp(message_pb2.Message(ready=message_pb2.Message.Ready()))
         self.state = State.READY
 
     def send_announcement(self, name: str, supported_labels: List[Label], configuration: Configuration):
@@ -232,7 +236,7 @@ class AdapterCore:
             name=name, labels=pb_supported_labels, configuration=pb_configuration
         )
 
-        self._send_message(message_pb2.Message(announcement=pb_announcement))
+        self._queue_message_to_amp(message_pb2.Message(announcement=pb_announcement))
 
     def _send_stimulus_confirmation(self, pb_label: label_pb2.Label):
         """
@@ -243,7 +247,7 @@ class AdapterCore:
             pb_label (label_pb2.Label)
         """
         logging.debug('Sending stimulus (back) to AMP: {label}'.format(label=pb_label.label))
-        self._send_message(message_pb2.Message(label=pb_label))
+        self._queue_message_to_amp(message_pb2.Message(label=pb_label))
 
     def handle_message(self, raw_message:str):
         """
@@ -277,11 +281,11 @@ class AdapterCore:
         else:
             logging.debug('Unknown message type: {msg}'.format(msg=pb_message))
 
-    def _send_message(self, message: message_pb2.Message):
+    def _queue_message_to_amp(self, message: message_pb2.Message):
         """
         Adds message to the queue of pending messages to AMP.
         Separate thread takes care of the actual sending of the message.
-        See _worker_send_messages_to_amp below.
+        See the worker _send_message_to_amp below.
 
         Args:
             message (message_pb2.Message)

@@ -37,7 +37,6 @@ class Handler(ABC):
     def reset(self):
         """
         Prepare the SUT for the next test case.
-        This method should be called by the child's reset() method.
         """
         pass
 
@@ -45,7 +44,6 @@ class Handler(ABC):
     def stop(self):
         """
         Stop the SUT from testing.
-        This method should be called by the child's reset() method.
         """
         pass
 

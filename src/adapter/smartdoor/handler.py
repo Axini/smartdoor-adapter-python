@@ -56,7 +56,6 @@ class Handler(AbstractHandler):
         Prepare the SUT for the next test case.
         """
         logging.info('Resetting the SUT for a new test case')
-        super().reset()
         self.sut.send('RESET')
 
     def stop(self):
@@ -64,7 +63,6 @@ class Handler(AbstractHandler):
         Stop the SUT from testing.
         """
         logging.info('Stopping the plugin handler')
-        super().stop()
         self.sut.stop()
         self.sut = None
 
