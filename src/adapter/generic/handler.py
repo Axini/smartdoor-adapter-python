@@ -3,6 +3,7 @@ import logging
 from abc import ABC, abstractmethod
 from typing import List
 
+from generic.api import label_pb2
 from generic.api.configuration import Configuration
 from generic.api.label import Label
 
@@ -22,14 +23,20 @@ class Handler(ABC):
             adapter_core (AdapterCore): Reference to the adapter core
         """
         self.adapter_core = adapter_core
+        self.configuration = self.default_configuration()
+
+    def set_configuration(self, configuration: Configuration):
+        """ Set the configuration of the adapter. """
+        self.configuration = configuration
+
+    def get_configuration(self) -> Configuration:
+        """ The current configuration of the adapter. """
+        return self.configuration
 
     @abstractmethod
-    def start(self, configuration: Configuration):
+    def start(self):
         """
         Start a new test case.
-
-        Args:
-            configuration (Configuration): The configuration needed to start testing
         """
         pass
 
@@ -48,15 +55,12 @@ class Handler(ABC):
         pass
 
     @abstractmethod
-    def stimulate(self, label: Label) -> str:
+    def stimulate(self, pb_label: label_pb2.Label):
         """
         Processes a stimulus of a given label at the SUT.
 
         Args:
-            label (Label): stimulus that the Axini Modeling Platform has sent
-
-        Returns:
-             str: The physical label.
+            pb_label (label_pb2.Label): stimulus that the Axini Modeling Platform has sent
         """
         pass
 
@@ -71,11 +75,11 @@ class Handler(ABC):
         pass
 
     @abstractmethod
-    def configuration(self) -> Configuration:
+    def default_configuration(self) -> Configuration:
         """
-        The configuration needed by the adapter
+        The default configuration of this adapter.
 
         Returns:
-            Configuration: The configuration required by this adapter.
+            Configuration: the default configuration required by this adapter.
         """
         pass

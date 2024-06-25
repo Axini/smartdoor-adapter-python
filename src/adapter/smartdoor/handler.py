@@ -1,6 +1,9 @@
 import logging
+import time
+
 from datetime import datetime
 
+from generic.api import label_pb2
 from generic.api.configuration import ConfigurationItem, Configuration
 from generic.api.label import Label, Sort
 from generic.api.parameter import Type, Parameter
@@ -40,15 +43,12 @@ class Handler(AbstractHandler):
             label = self._message2label(raw_message)
             self.adapter_core.send_response(label)
 
-    def start(self, configuration: Configuration):
+    def start(self):
         """
         Start a test.
-
-        Args:
-            configuration (Configuration): The configuration to be used for this test run. First item contains the
-                url of the SmartDoor SUT.
         """
-        self.sut = SmartDoorConnection(self, configuration.items[0].value)
+        end_point = self.configuration.items[0].value
+        self.sut = SmartDoorConnection(self, end_point)
         self.sut.connect()
 
     def reset(self):
@@ -68,23 +68,25 @@ class Handler(AbstractHandler):
 
         logging.debug('Finished stopping the plugin handler')
 
-    def stimulate(self, label: Label) -> str:
+    def stimulate(self, pb_label: label_pb2.Label):
         """
-        Processes a stimulus of a given Label message at the SUT.
+        Processes a stimulus of a given label at the SUT.
 
         Args:
-            label (Label)
-
-        Returns:
-            str: The raw message send to the SUT (in a format that is
-                 understood by the SUT).
+            pb_label (label_pb2.Label): stimulus that the Axini Modeling Platform has sent
         """
+
+        label = Label.decode(pb_label)
+        sut_msg = self._label2message(label)
+
+        # send confirmation of stimulus back to AMP
+        pb_label.timestamp = time.time_ns()
+        pb_label.physical_label = bytes(sut_msg, 'UTF-8')
+        self.adapter_core.send_stimulus_confirmation(pb_label)
+
         # leading spaces are needed to justify the stimuli and responses
         logging.info('      Injecting stimulus @SUT: ?{name}'.format(name=label.name))
-        sut_msg = self._label2message(label)
         self.sut.send(sut_msg)
-        physical_label = bytes(sut_msg, 'UTF-8')
-        return physical_label
 
     def supported_labels(self):
         """
@@ -109,12 +111,12 @@ class Handler(AbstractHandler):
             _response('shut_off'),
         ]
 
-    def configuration(self):
+    def default_configuration(self) -> Configuration:
         """
-        The configuration items exposed and needed by this adapter.
+        The default configuration of this adapter.
 
         Returns:
-            Configuration
+            Configuration: the default configuration required by this adapter.
         """
         return Configuration([ConfigurationItem(\
             name='endpoint',
