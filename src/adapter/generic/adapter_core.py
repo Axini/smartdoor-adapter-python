@@ -47,15 +47,14 @@ class AdapterCore:
         self.qthread_to_amp = QThread(process_item = self._send_message_to_amp)
         self.qthread_to_amp.start()
 
-        # QThread for injecting stimuli into the SUT.
-        self.qthread_to_sut = QThread(process_item = self._call_stimulate)
-        self.qthread_to_sut.start()
+        # QThread for handling messages from AMP.
+        self.qthread_handle_message = QThread(process_item = self._handle_message)
+        self.qthread_handle_message.start()
 
     def start(self):
         """ Start the adapter core which will open a connection with AMP. """
-        logging.debug('Clearing queues with pending messages')
-        self.qthread_to_amp.clear_queue()
-        self.qthread_to_sut.clear_queue()
+
+        self._clear_qthread_queues()
 
         if self.state == State.DISCONNECTED:
             logging.info('Connecting to broker')
@@ -68,7 +67,8 @@ class AdapterCore:
         if self.state == State.DISCONNECTED:
             self.state = State.CONNECTED
 
-            self.send_announcement(self.name, self.handler.supported_labels(), self.handler.configuration())
+            self.send_announcement(self.name, self.handler.supported_labels(),
+                                   self.handler.get_configuration())
             self.state = State.ANNOUNCED
         else:
             logging.info('Connection opened while already connected')
@@ -76,18 +76,14 @@ class AdapterCore:
     def on_close(self):
         """ Connection with AMP has been closed. Try to reconnect. """
         self.state = State.DISCONNECTED
-
-        logging.info('Clearing queues with pending messages')
-        self.qthread_to_amp.clear_queue()
-        self.qthread_to_sut.clear_queue()
-
+        self._clear_qthread_queues()
         self.handler.stop()
         logging.info('Trying to reconnect to AMP')
         self.start() # reconnect to AMP - keep the adapter alive
 
     def on_configuration(self, pb_config: configuration_pb2.Configuration):
         """
-        Broker call back when a `Configuration` message is received from AMP.
+        Call back when a `Configuration` message is received from AMP.
 
         Args:
             pb_config (configuration_pb2.Configuration)
@@ -99,7 +95,9 @@ class AdapterCore:
             # Start the SUT
             logging.info('Connecting to the SUT')
             try:
-                self.handler.start(Configuration.decode(pb_config))
+                self.handler.set_configuration(Configuration.decode(pb_config))
+                self.handler.start()
+
             except Exception as e:
                 logging.error('Error connection to the SUT: {}'.format(e))
                 self.send_error(str(e))
@@ -117,7 +115,7 @@ class AdapterCore:
 
     def on_label(self, pb_label: label_pb2.Label):
         """
-        Broker call back when a Label message is received from AMP.
+        Call back when a Label message is received from AMP.
 
         Args:
             pb_label (label_pb2.Label)
@@ -130,8 +128,8 @@ class AdapterCore:
 
             try:
                 # Perform the stimulus action (which could trigger a response).
-                logging.debug("Adding stimulus '{label}' to the queue of stimuli for the SUT".format(label=pb_label.label))
-                self.qthread_to_sut.put(pb_label)
+                logging.debug("Call handler.stimulate for '{name}'".format(name=pb_label.label))
+                self.handler.stimulate(pb_label)
 
             except Exception as e:
                 logging.error('Exception: {ex}'.format(ex=e))
@@ -142,15 +140,13 @@ class AdapterCore:
             self.send_error(message)
 
     def on_reset(self):
-        """ Broker call back when a Reset message is received. """
+        """ Call back when a Reset message is received. """
         if self.state == State.READY:
             logging.debug('Reset message received')
-
-            logging.info('Clearing queues with pending messages')
-            self.qthread_to_amp.clear_queue()
-            self.qthread_to_sut.clear_queue()
+            self._clear_qthread_queues()
 
             try:
+                logging.debug('Resetting the SUT')
                 response = self.handler.reset()
                 if response:
                     message = 'Resetting the SUT failed due to: {reason}'.format(reason=response)
@@ -170,7 +166,7 @@ class AdapterCore:
 
     def on_error(self, message: str):
         """
-        Broker call back when a Error message is received.
+        Call back when a Error message is received.
 
         Args:
             message (str): The error message
@@ -238,7 +234,7 @@ class AdapterCore:
 
         self._queue_message_to_amp(message_pb2.Message(announcement=pb_announcement))
 
-    def _send_stimulus_confirmation(self, pb_label: label_pb2.Label):
+    def send_stimulus_confirmation(self, pb_label: label_pb2.Label):
         """
         Confirm a received stimulus by sending it back to AMP.
         The fields of pb_label have already been set by the caller.
@@ -246,17 +242,31 @@ class AdapterCore:
         Args:
             pb_label (label_pb2.Label)
         """
-        logging.debug('Sending stimulus (back) to AMP: {label}'.format(label=pb_label.label))
+        logging.debug('Sending confirmation for stimulus ?{label} to AMP'.format(label=pb_label.label))
         self._queue_message_to_amp(message_pb2.Message(label=pb_label))
 
     def handle_message(self, raw_message:str):
         """
-        Handle the message coming in from AMP
+        Handle the message coming in from AMP.
+        Adds the message to the queue of messages to be handled by
+        qthread_handle_message.
+
+        Args:
+            raw_message (str): Raw string message from AMP.
+        """
+        logging.debug('Adding message (id: {id}) from AMP to the queue to be handled'.format(id=id(raw_message)))
+        self.qthread_handle_message.put(raw_message)
+
+    def _handle_message(self, raw_message:str):
+        """
+        QThread's process_item method for processing a raw_message from AMP.
+        Handles the message from AMP.
 
         Args:
             raw_message (str): Raw string message from AMP.
         """
 
+        logging.debug('Starting the handling of message (id: {id}) from AMP'.format(id=id(raw_message)))
         pb_message = message_pb2.Message()
 
         try:
@@ -281,6 +291,11 @@ class AdapterCore:
         else:
             logging.debug('Unknown message type: {msg}'.format(msg=pb_message))
 
+    def _clear_qthread_queues(self):
+        logging.info('Clearing queues with pending messages')
+        self.qthread_to_amp.clear_queue()
+        self.qthread_handle_message.clear_queue()
+
     def _queue_message_to_amp(self, message: message_pb2.Message):
         """
         Adds message to the queue of pending messages to AMP.
@@ -297,11 +312,3 @@ class AdapterCore:
         """ QThread's process_item method for sending a message to AMP. """
         logging.debug('Sending message to AMP ({id})'.format(id=id(message)))
         self.broker_connection.send(message.SerializeToString())
-
-    def _call_stimulate(self, pb_label):
-        """ QThread's process_item method for processing a pb_label stimulus. """
-        label = Label.decode(pb_label)
-        logging.debug("Call handler.stimulate for '{name}'".format(name=label.name))
-        pb_label.timestamp = time.time_ns()
-        pb_label.physical_label = self.handler.stimulate(label)
-        self._send_stimulus_confirmation(pb_label)
