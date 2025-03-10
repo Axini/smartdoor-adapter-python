@@ -8,7 +8,7 @@ The software is distributed under the MIT license, see LICENSE.
 
 ## Running the adapter
 ### Prerequisites
-This example adapter is depended on Python (>= 3.10) and uses `pip` for its dependency management. The steps below presume that the `python` and `pip` commands are resolvable in your shell.
+This example adapter is depended on Python (>= 3.11) and uses `pip` for its dependency management. The steps below presume that the `python` and `pip` commands are resolvable in your shell.
 
 ### Setting it up
 - Clone this repository.
@@ -31,10 +31,10 @@ This example adapter is depended on Python (>= 3.10) and uses `pip` for its depe
 - Run `make html`.
 - Documentation is generated under `docs/_build`.
 
-### Some notes on the implementation
+## Some notes on the implementation
 The AMP related code is stored in src/adapter/generic and can be used as-is for **any** Python plugin adapter. All SUT specific code (in this case for the SmartDoor SUT) is stored in src/adapter/smartdoor and should be modified for any new SUT.
 
-#### Threads
+### Threads
 The main thread of the adapter ensures that messages from AMP are received and handled. The SmartdoorConnection class (in src/adapter/smartdoor) starts a separate thread which is used for the messages from the SmartDoor SUT over the WebSocket connection between the SUT and the adapter. 
 
 The class QThread (in src/adapter/generic) manages a Queue of items and a Thread. Items can be added to the Queue and the Thread processes items from the queue in a FIFO manner. The Queue can also be emptied. The plugin adapter (class AdapterCore in src/adapter/generic) uses two QThreads for (i) handling messages from AMP and (ii) sending messages to AMP. This ensures that messages from AMP (stimuli) and the SUT (responses) are serviced immediately: any resulting message is added to a queue of pending messages which is processed by either one of the two QThreads.
