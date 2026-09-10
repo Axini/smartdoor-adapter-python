@@ -1,6 +1,6 @@
-from adapter.generic.api import configuration_pb2
-from adapter.generic.api.configuration import ConfigurationItem
-from adapter.generic.api.type import Type
+from generic.api import configuration_pb2
+from generic.api.configuration import ConfigurationItem
+from generic.api.type import Type
 
 
 def test_configuration_item_creation():

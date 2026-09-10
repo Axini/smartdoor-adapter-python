@@ -12,6 +12,6 @@ Testing/
 CMakeCache.txt
 cmake_install.cmake
 CMakeFiles/
-Makefile
+/Makefile
 __pycache__
 .pytest_cache

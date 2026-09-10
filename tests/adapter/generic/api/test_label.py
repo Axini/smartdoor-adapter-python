@@ -2,10 +2,10 @@ from datetime import datetime
 
 import pytest
 
-from adapter.generic.api import label_pb2
-from adapter.generic.api.label import Label, Sort
-from adapter.generic.api.parameter import Parameter
-from adapter.generic.api.type import Type
+from generic.api import label_pb2
+from generic.api.label import Label, Sort
+from generic.api.parameter import Parameter
+from generic.api.type import Type
 
 
 def test_can_create_a_label():

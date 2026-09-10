@@ -9,5 +9,5 @@ setup(
     author_email="info@axini.com",
     description="Axini AMP Plugin Adapter for the SmartDoor example",
     package_dir={"": "src"},
-    python_requires='>=3.10',
+    python_requires='>=3.11',
 )
