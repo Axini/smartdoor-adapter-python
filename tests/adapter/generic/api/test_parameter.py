@@ -2,10 +2,10 @@ from datetime import datetime, date
 
 import pytest as pytest
 
-from adapter.generic.api import label_pb2
-from adapter.generic.api.parameter import Parameter
-from adapter.generic.api.type import Type
-from adapter.generic.util.namespace_util import to_obj
+from generic.api import label_pb2
+from generic.api.parameter import Parameter
+from generic.api.type import Type
+from generic.util.namespace_util import to_obj
 
 
 def test_can_create_parameter():

@@ -35,10 +35,9 @@ def start_plugin_adapter(adapter_name: str, url: str, token: str, loglevel: int)
     adapter_core.start()
 
 if __name__ == '__main__':
-    print("Parsing arguments")
     parser = argparse.ArgumentParser()
     parser.add_argument('-n', '--name',
-                        help='Adapter name suffix visible in AMP: "some_suffix" (optional)', required=False)
+                        help='Full adapter name visible in AMP: "some_name" (optional)', required=False)
     parser.add_argument('-u', '--url',
                         help='AMP Adapter URL reference: "wss://..."', required=True)
     parser.add_argument('-t', '--token',
@@ -49,12 +48,9 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    # Create the name as displayed on the adapter page of AMP
-    suffix = socket.gethostname()
-    if args.name:
-        suffix = args.name
-
-    name = ADAPTER_NAME + "@" + suffix
+    # Create the name as displayed on the adapter page of AMP.
+    # -n/--name, when given, is used as-is (other adapters pass their full name here).
+    name = args.name if args.name else ADAPTER_NAME + "@" + socket.gethostname()
 
     if not args.log_level:
         log_level = logging.INFO
